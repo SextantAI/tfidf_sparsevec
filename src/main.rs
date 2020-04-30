@@ -5,7 +5,8 @@ use std::collections::HashMap; // for dictionaries
 use std::fs::File; // for creating and writing files
 use std::io::prelude::*; // allows File.write_all
 
-
+const BIN_DIVISIONS: u64 = 40_000_000;
+const DOC_FREQ_FILE: &str = "WikiDocFreq_40m";
 
 fn text_bin_counts(text: String) -> HashMap<u32, f32> {
     // text goes in, sparse vector comes out
@@ -33,12 +34,12 @@ fn text_bin_counts(text: String) -> HashMap<u32, f32> {
 
         // hash the stem, find its bin, and increment bin_counts
         h1 = shash( &stem.as_bytes() );
-        bin1 = (h1 % 15000000) as u32;
+        bin1 = (h1 % BIN_DIVISIONS) as u32;
         // get a pointer to the value, inserting 0 if it doesn't exist, and increment by 1
         *bin_counts.entry(bin1).or_insert(0f32)+=1f32; 
 
         h2 = shash( &bigram.as_bytes() );
-        bin2 = (h2 % 15000000) as u32;
+        bin2 = (h2 % BIN_DIVISIONS) as u32;
         // get a pointer to the value, inserting 0 if it doesn't exist, and increment by 1
         *bin_counts.entry(bin2).or_insert(0f32)+=1f32; 
         
@@ -84,7 +85,7 @@ fn dump_hashmap(filepath: &String, map: &HashMap<u32, f32>) {
     let mut file = File::create(filepath).expect("Unable to open file");
     let mut bytes: [u8;4];
 
-    for key in 0..15000000 {
+    for key in 0..BIN_DIVISIONS {
         let mapkey = key as u32;
         let val = match map.get(&mapkey) {
             Some(v) => v,
@@ -150,7 +151,7 @@ fn count_doc_freq() {
     })
     .unwrap();
 
-    dump_hashmap(&"WikiDocFrec_15m".to_string(), &doc_freq);
+    dump_hashmap(&DOC_FREQ_FILE.to_string(), &doc_freq);
 
 }
 
