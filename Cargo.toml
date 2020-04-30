@@ -12,4 +12,5 @@ edition = "2018"
 rust-stemmers = "1.2.0"
 # for fast, portable hashing
 seahash = "4.0.0"
-
+# for sqlite database access
+sqlite = "0.25.0"
