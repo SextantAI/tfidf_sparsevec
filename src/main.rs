@@ -21,8 +21,9 @@ fn text_bin_counts(text: String) -> HashMap<u32, f32> {
     let mut bin_counts: HashMap<u32, f32> = HashMap::new(); // a "sparse vector" for counts fo binned hashes
 
     // convert text to lower case and iterate over words
-    let low_string = text.to_lowercase();
-    let words = low_string.split_whitespace();
+    let text_clean = text.replace(&['(', ')', ',', '\"', '.', ';', ':', '\''][..], "");
+    let text_lower = text_clean.to_lowercase();
+    let words = text_lower.split_whitespace();
     for gram in words  {
 
         // find the word stem and bigram with the previous stem
@@ -32,12 +33,12 @@ fn text_bin_counts(text: String) -> HashMap<u32, f32> {
 
         // hash the stem, find its bin, and increment bin_counts
         h1 = shash( &stem.as_bytes() );
-        bin1 = (h1 % 5000) as u32;
+        bin1 = (h1 % 15000000) as u32;
         // get a pointer to the value, inserting 0 if it doesn't exist, and increment by 1
         *bin_counts.entry(bin1).or_insert(0f32)+=1f32; 
 
         h2 = shash( &bigram.as_bytes() );
-        bin2 = (h2 % 5000) as u32;
+        bin2 = (h2 % 15000000) as u32;
         // get a pointer to the value, inserting 0 if it doesn't exist, and increment by 1
         *bin_counts.entry(bin2).or_insert(0f32)+=1f32; 
         
@@ -77,29 +78,32 @@ fn cosine_similarity(u: HashMap<u32, f32>, v: HashMap<u32, f32>) -> f32 {
 
 }
 
-fn dump_hashmap(map: &HashMap<u32, f32>) {
+fn dump_hashmap(filepath: &String, map: &HashMap<u32, f32>) {
     
-    let mut file = File::create("delF2").expect("Unable to open file");
+    println!("Dumping hashmap to a binary file...");
+    let mut file = File::create(filepath).expect("Unable to open file");
     let mut bytes: [u8;4];
 
-    for key in 0..5000 {
+    for key in 0..15000000 {
         let mapkey = key as u32;
         let val = match map.get(&mapkey) {
             Some(v) => v,
             _ => &0f32,
         };
-        println!("{}-{}", mapkey, val);
-        bytes = unsafe { std::mem::transmute(99u32.to_be()) };
+        //println!("{}-{}", mapkey, val);
+        bytes = val.to_be_bytes();
         file.write_all(&bytes).expect("unable to write");
+        if key % 500000 == 0 {
+            println!("{} keys dumped...", key);
+        }
     }
+    println!("Successfully saved {}", filepath);
 }
-fn main() {
-    
-    let vec1 = text_bin_counts("I wanna play all day".to_string());
-    let vec2 = text_bin_counts("All work and no play makes for a sad day".to_string());
 
-    let sim = cosine_similarity(vec1, vec2);
-    println!("similarity={}", sim);
+
+fn count_doc_freq() {
+    
+
 
     let mut doc_freq: HashMap<u32, f32> = HashMap::new();
     let mut doc_ct: u32 = 0;
@@ -107,11 +111,8 @@ fn main() {
     
 
     let connection = sqlite::open("Wiki16.db").unwrap();
-
-    
-
     connection
-    .iterate("SELECT id, text FROM documents LIMIT 2000", |pairs| {
+    .iterate("SELECT id, text FROM documents", |pairs| {
         for &(column, value) in pairs.iter() {
             //println!("{} = {}", column, value.unwrap());
             if column == "id" {
@@ -119,8 +120,11 @@ fn main() {
                 let bin_counts = text_bin_counts(value.unwrap().to_string());
                 for (bin, count) in bin_counts {
                     //println!("{}.{}", bin, count)
-                    *doc_freq.entry(bin).or_insert(0f32)+= 10f32*count; 
+                    *doc_freq.entry(bin).or_insert(0f32)+= 5f32*count; 
                 }
+                //println!("id {}", &doc_freq.keys().len());
+
+                
                 
             }
             if column == "text" {
@@ -130,11 +134,13 @@ fn main() {
                     //println!("{}.{}", bin, count)
                     *doc_freq.entry(bin).or_insert(0f32)+=count; 
                 }
-
+                //println!("text {}", &doc_freq.keys().len());
                 doc_ct = doc_ct + 1;
-                if doc_ct % 100 == 0 {
+                if doc_ct % 1000 == 0 {
                     let key_ct = &doc_freq.keys().len();
                     println!("docs={}, nonzero={}", doc_ct, key_ct);
+
+                
 
             }
 
@@ -144,6 +150,14 @@ fn main() {
     })
     .unwrap();
 
-    dump_hashmap(&doc_freq);
+    dump_hashmap(&"WikiDocFrec_15m".to_string(), &doc_freq);
 
+}
+
+fn main() {
+    //let vec1 = text_bin_counts("I wanna play all day".to_string());
+    //let vec2 = text_bin_counts("All work and no play makes for a sad day".to_string());
+    //let sim = cosine_similarity(vec1, vec2);
+    //println!("similarity={}", sim);
+    count_doc_freq();
 }
